@@ -541,6 +541,51 @@ static HRESULT extract_zip_with_shell(const wchar_t *zip_path, const wchar_t *de
 	return hr;
 }
 
+/* Create a .lnk shortcut pointing to target and save it to link_path. Non-fatal on failure. */
+static HRESULT create_shortcut(const wchar_t *target, const wchar_t *arguments, const wchar_t *working_dir, const wchar_t *description, const wchar_t *link_path) {
+	if (!target || !link_path) {
+		return E_INVALIDARG;
+	}
+
+	HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	BOOL need_uninit = FALSE;
+	if (SUCCEEDED(hr)) {
+		need_uninit = TRUE;
+	} else if (hr == RPC_E_CHANGED_MODE) {
+		hr = S_OK;
+	}
+
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	IShellLinkW *psl = NULL;
+	hr = CoCreateInstance(&CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, &IID_IShellLinkW, (void **)&psl);
+	if (FAILED(hr)) {
+		if (need_uninit) CoUninitialize();
+		return hr;
+	}
+
+	if (psl) {
+		psl->lpVtbl->SetPath(psl, target);
+		if (arguments) psl->lpVtbl->SetArguments(psl, arguments);
+		if (working_dir) psl->lpVtbl->SetWorkingDirectory(psl, working_dir);
+		if (description) psl->lpVtbl->SetDescription(psl, description);
+
+		IPersistFile *ppf = NULL;
+		hr = psl->lpVtbl->QueryInterface(psl, &IID_IPersistFile, (void **)&ppf);
+		if (SUCCEEDED(hr) && ppf) {
+			hr = ppf->lpVtbl->Save(ppf, link_path, TRUE);
+			ppf->lpVtbl->Release(ppf);
+		}
+
+		psl->lpVtbl->Release(psl);
+	}
+
+	if (need_uninit) CoUninitialize();
+	return hr;
+}
+
 int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prev_instance, LPWSTR command_line, int show_command) {
 	(void)instance;
 	(void)prev_instance;
@@ -614,6 +659,22 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE prev_instance, LPWSTR comman
 	if (FAILED(hr)) {
 		show_error_message(L"Namida Installer", L"Unable to extract archive.", (DWORD)hr, TRUE);
 		return (int)hr;
+	}
+
+	/* Attempt to create a desktop shortcut to Namida\namida.exe. Non-fatal. */
+	wchar_t target_exe[MAX_PATH];
+	hr = StringCchPrintfW(target_exe, ARRAYSIZE(target_exe), L"%s\\namida.exe", destination_root);
+	if (SUCCEEDED(hr)) {
+		wchar_t desktop[MAX_PATH];
+		if (SHGetFolderPathW(NULL, CSIDL_DESKTOPDIRECTORY, NULL, SHGFP_TYPE_CURRENT, desktop) == S_OK) {
+			wchar_t link_path[MAX_PATH];
+			if (SUCCEEDED(StringCchPrintfW(link_path, ARRAYSIZE(link_path), L"%s\\Namida.lnk", desktop))) {
+				hr = create_shortcut(target_exe, NULL, destination_root, L"Namida for Windows XP", link_path);
+				if (FAILED(hr)) {
+					show_error_message(L"Namida Installer", L"Unable to create desktop shortcut.", (DWORD)hr, TRUE);
+				}
+			}
+		}
 	}
 
 	MessageBoxW(NULL,
