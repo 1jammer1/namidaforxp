@@ -31,7 +31,7 @@ if [ -f "$ASM_DIR/Namida-x86_64-Installer.exe" ]; then
     # Try to extract if innoextract is available
     if command -v innoextract >/dev/null 2>&1; then
         echo "Found installer! Extracting to app..."
-        innoextract -d "$APP_DIR" "$ASM_DIR/Namida-x86_64-Installer.exe" || true
+        innoextract -d "$ROOT_DIR" "$ASM_DIR/Namida-x86_64-Installer.exe" || true
     else
         echo "Couldn't find innoextract tool - skipping extraction step."
     fi
