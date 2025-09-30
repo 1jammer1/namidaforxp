@@ -14,11 +14,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: install boost
-      run: sudo apt install libboost-all-dev
+    - name: install boost and liblzma
+      run: sudo apt install libboost-all-dev liblzma-dev
 
     - name: clone innoextract
-      run: git clone https://github.com/dscharrer/innoextract.git && cd innoextract && mkdir -p build && cd build && cmake .. && make && make install && cd ../..
+      run: cd /tmp && git clone https://github.com/dscharrer/innoextract.git && cd innoextract && mkdir -p build && cd build && cmake .. && make && make install && cd ../..
 
     - name: Install dependencies
       run: bash sh.sh
